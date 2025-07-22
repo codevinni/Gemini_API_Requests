@@ -17,10 +17,10 @@ app.use(bodyParser.json());
 app.use(express.text());
 app.use('/img', express.static('public/img')); // Acesso as imagens armazenadas.
 
-const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY);
-
 // Rota POST para requisitarPost. 
 app.post('/requisitarPost', async (req, res) => {
+    
+    const genAI = new GoogleGenAI({apiKey: process.env.GEMINI_KEY1});
 
     const interessesPredefinidos = req.body.interesses || [];
 
@@ -82,9 +82,16 @@ app.post('/requisitarPost', async (req, res) => {
 });
 
 // Rota POST para requisitarUserData. 
-app.get('/requisitarUserData', async (req, res) => {
+app.get('/requisitarUserData', async (req, res) => {   
 
-    let prompt = 'Crie dados para um usuário de uma rede social. Os dados gerados serão:\n - nome: um nome composto, sem espaços entre os nomes, cujo primeiro nome seja o nome de alguma celebridade aleatória, personagem fictício, nome popular, mistura de cada um, e o segundo nome aleatório idem.\n - email: relacionado ao nome do usuário.\n - senha: caracteres aleatórios \n';
+    const genAI = new GoogleGenAI({apiKey: process.env.GEMINI_KEY2});
+
+    let prompt = `Crie dados para um usuário de uma rede social. Os dados gerados serão:\n
+                 - nome: um nome composto, sem espaços entre os nomes, cujo primeiro nome seja o nome de alguma celebridade
+                   aleatória, personagem fictício, nome popular, mistura de cada um, e o segundo nome aleatório idem.\n
+                 - email: relacionado ao nome do usuário.\n
+                 - senha: caracteres aleatórios\n
+    `;
 
     // Especifica o formato esperado da resposta.
     prompt += 'O retorno deve estar somente no formato JSON: {"nome": "Nome", "email": "email@email.com", "senha": "xxx"}';
@@ -124,9 +131,11 @@ app.get('/requisitarUserData', async (req, res) => {
 
 // Rota POST para requisitarImagemPerfil. 
 app.post('/requisitarImagemPerfil', async (req, res) => {
+    
+    const genAI = new GoogleGenAI({apiKey: process.env.GEMINI_KEY3});
 
     const username = req.body;
-    const prompt = `Crie uma imagem 400x400 de uma pessoa com traços aleatórios baseando-se no nome fictício: ${username}. A resposta deve conter apenas uma imagem, sem qualquer texto.`
+    const prompt = `Crie uma imagem de uma pessoa com traços aleatórios baseando-se no nome fictício: ${username}. A resposta deve conter apenas uma imagem, sem qualquer texto.`
 
     try {
 
@@ -160,7 +169,52 @@ app.post('/requisitarImagemPerfil', async (req, res) => {
     }
 });
 
+
+app.post('/requisitarBioUsuarioF', async (req, res) => {
+    const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_KEY4 });
+
+    const interessesPredefinidos = req.body.interesses || [];
+    const nome = req.body.nome || ""; // <- agora como string
+    let prompt = 'Crie uma bio de um usuário fictício para uma rede social, como se fosse um jovem da geração Z.';
+
+    if (nome) {
+        prompt += ` O nome do usuário é "${nome}, use os pronomes corretos com base nesse nome fornecido, randomize a escolha de começar ou não com a frase: Meu nome é...".`;
+    }
+
+    prompt += ' A bio deve ser uma apresentação com base nos interesses do usuário e em sua personalidade. Esta bio não deve conter nenhuma hashtag em seu corpo.\n';
+
+    if (interessesPredefinidos.length > 0) {
+        prompt += 'Baseado em pelo menos um dos seguintes interesses: ';
+        prompt += interessesPredefinidos.map(i => `"${i}"`).join(', ') + '.\n';
+    }
+
+    prompt += '- Determine de 1 a 5 interesses relacionados ao conteúdo da bio.';
+    prompt += ' O retorno deve estar somente no formato JSON: {"texto": "...", "interesses": ["...", "..."] }';
+
+    try {
+        const response = await genAI.models.generateContent({
+            model: 'gemini-2.5-flash-lite-preview-06-17',
+            contents: prompt
+        });
+
+        const text = response.text;
+        const jsonMatch = text.match(/{[\s\S]*}/);
+
+        if (!jsonMatch)
+            throw new Error('Resposta fora do formato esperado.');
+
+        const post = JSON.parse(jsonMatch[0]);
+        const texto = post.texto || null;
+        const interesses = post.interesses || [];
+
+        res.json({ texto, interesses });
+    } catch (error) {
+        console.error('Erro:', error);
+        res.status(500).json({ texto: null, interesses: interessesPredefinidos || [] });
+    }
+});
+
 // Inicia o servidor na porta especificada.
 app.listen(PORT, () => {
-  console.log(`Servidor rodando na porta ${PORT}`);
+  console.log(`Servidor rodando em http://localhost:${PORT}`);
 });
